@@ -5,6 +5,9 @@ from langchain.chains import RetrievalQA
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_community.vectorstores import FAISS
 from huggingface_hub import InferenceClient
+from langchain.agents import Tool, initialize_agent
+from langchain.agents.agent_types import AgentType
+from langchain_community.tools.pubmed.tool import PubmedQueryRun
 
 # Setup LLM (Mistral with HuggingFace)
 from dotenv import load_dotenv, find_dotenv
@@ -44,7 +47,8 @@ DB_FAISS_PATH="vectorstore/db_faiss"
 embedding_model=HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
 db=FAISS.load_local(DB_FAISS_PATH, embedding_model, allow_dangerous_deserialization=True)
 
-# Create QA chain
+
+# Tool 1: RAG-based QA
 qa_chain=RetrievalQA.from_chain_type(
     llm=load_llm(HUGGINGFACE_REPO_ID),
     chain_type="stuff",
@@ -53,8 +57,40 @@ qa_chain=RetrievalQA.from_chain_type(
     chain_type_kwargs={'prompt':set_custom_prompt(CUSTOM_PROMPT_TEMPLATE)}
 )
 
+internal_doc_tool = Tool(
+    name="Internal Medical QA",
+    func=lambda q: qa_chain.invoke({"query": q})["result"],  # extract the final answer cleanly
+    description="Use this tool for questions answerable from internal hospital or clinical documentation."
+)
+
+
+# Tool 2: PubMed Query
+pubmed_tool = PubmedQueryRun()
+pubmed_search_tool = Tool(
+    name="PubMed Search",
+    func=pubmed_tool.run,
+    description="Use this for finding the latest research papers, medical trials, and scholarly literature on any medical topic. Especially useful for up-to-date findings, studies, or treatments."
+)
+
+tools = [internal_doc_tool, pubmed_search_tool]
+
+agent = initialize_agent(
+    tools=tools,
+    llm=load_llm(HUGGINGFACE_REPO_ID),
+    agent=AgentType.ZERO_SHOT_REACT_DESCRIPTION,
+    verbose=True,
+    agent_kwargs={
+        "prefix": """You are a helpful medical assistant. You have access to two tools:
+        - Use the "Internal Medical QA" tool when the user asks something that may be answered from internal hospital or clinical documents.
+        - Use 'PubMed Search' for up-to-date research, recent trials, or when the question mentions "recent", "new", "latest" or "research".
+
+        Be smart. Do not fabricate answers. Only use one tool per query. Explain your reasoning when appropriate."""
+            }
+)
+
+
 # Now invoke with a single query
 user_query=input("Write Query Here: ")
-response=qa_chain.invoke({'query': user_query})
-print("RESULT: ", response["result"])
-print("SOURCE DOCUMENTS: ", response["source_documents"])
+response = agent.invoke({"input": user_query})
+print("RESULT:\n", response["output"])
+# print("SOURCE DOCUMENTS: ", response["source_documents"])
