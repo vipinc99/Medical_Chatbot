@@ -1,4 +1,4 @@
-# 🩺 Medical Chatbot Agent using LangChain + PubMed + FAISS
+# 🩺 Medical Chatbot Agent
 
 This project is an AI-powered medical chatbot built using **LangChain**, **Mistral-7B**, and **FAISS**, capable of answering medical questions by combining internal clinical documents with live PubMed search. It uses an **Agentic RAG** setup to dynamically choose between two tools:
 
