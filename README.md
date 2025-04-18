@@ -14,8 +14,6 @@ This project is an AI-powered medical chatbot built using **LangChain**, **Mistr
 - **FAISS**: For fast vector similarity search on internal documents
 - **PubMedQueryRun**: LangChain community tool for live research retrieval
 - **HuggingFaceEmbeddings**: For vectorizing documents
-- **Python**: Backend logic
-- **.env**: For storing Hugging Face API token securely
 
 
 
